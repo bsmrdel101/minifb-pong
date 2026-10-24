@@ -28,6 +28,10 @@ struct Paddle {
   color: u32
 }
 
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+  a + (b - a) * t
+}
+
 fn main() {
   let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
 
@@ -50,7 +54,8 @@ fn main() {
   let mut player_1_score = 0;
   let mut player_2_score = 0;
   let mut ball = Ball::new(30, 30);
-  let mut paddle_1 = Paddle::new(20, 50);
+  let mut paddle_1 = Paddle::new(5, HEIGHT / 2, 20, 50);
+  let mut paddle_2 = Paddle::new(WIDTH - 5 - 20, HEIGHT / 2, 20, 50);
 
   while window.is_open() && !window.is_key_down(Key::Escape) {
     if window.get_mouse_down(MouseButton::Left) {
@@ -64,37 +69,23 @@ fn main() {
       }
     }
 
+    paddle_2.y = lerp(ball.y as f32 - paddle_2.h as f32 / 2.0, paddle_2.y as f32, 0.67) as usize;
+
     for (i, pixel) in buffer.iter_mut().enumerate() {
       *pixel = BG;
       let (x, y) = (i % WIDTH, (i / WIDTH));
       
-      if started &&
-        x >= ball.x && x <= ball.x + ball.w &&
-        y >= ball.y && y <= ball.y + ball.h
-      {
-        *pixel = ball.color;
-      }
-
-      if
-        x >= paddle_1.x && x <= paddle_1.x + paddle_1.w &&
-        y >= paddle_1.y && y <= paddle_1.y + paddle_1.h
-      {
-        *pixel = paddle_1.color;
-      }
+      ball.render(&x, &y, pixel, started);
+      paddle_1.render(&x, &y, pixel);
+      paddle_2.render(&x, &y, pixel);
     }
 
     if started {
       let mut new_x = ball.x as i32 + ball.x_vel;
       let new_y = ball.y as i32 + ball.y_vel;
 
-      if
-        new_x >= (paddle_1.x as i32) && new_x <= (paddle_1.x as i32) + (paddle_1.w as i32) &&
-        new_y + (ball.h as i32) >= (paddle_1.y as i32) && new_y <= (paddle_1.y as i32) + (paddle_1.h as i32)
-      {
-        new_x = ball.x as i32 + -ball.x_vel;
-        ball.x_vel = -ball.x_vel;
-        ball.y_vel = ((paddle_1.y as i32) - (ball.y as i32)) / 2;
-      }
+      new_x = paddle_1.collide(&mut new_x, &new_y, &mut ball);
+      new_x = paddle_2.collide(&mut new_x, &new_y, &mut ball);
 
       if new_x >= WIDTH as i32 {
         player_1_score += 1;
@@ -139,10 +130,19 @@ impl Ball {
     ball
   }
 
+  pub fn render(&self, x: &usize, y: &usize, pixel: &mut u32, started: bool) {
+    if started &&
+      *x >= self.x && *x <= self.x + self.w &&
+      *y >= self.y && *y <= self.y + self.h
+    {
+      *pixel = self.color;
+    }
+  }
+
   pub fn respawn(&mut self) {
     sleep(time::Duration::from_secs_f32(0.5));
     let side = rand::rng().random_range(0..=1);
-    let mut x_vel = rand::rng().random_range(10..20);
+    let mut x_vel = rand::rng().random_range(10..30);
     if side == 0 {
       x_vel = -x_vel;
     }
@@ -153,13 +153,34 @@ impl Ball {
 }
 
 impl Paddle {
-  pub fn new(w: usize, h: usize) -> Self {
+  pub fn new(x: usize, y: usize, w: usize, h: usize) -> Self {
     Self {
       w,
       h,
-      x: 5,
-      y: HEIGHT / 2,
+      x,
+      y,
       color: 0xffffff
     }
+  }
+
+  pub fn render(&self, x: &usize, y: &usize, pixel: &mut u32) {
+    if
+      *x >= self.x && *x <= self.x + self.w &&
+      *y >= self.y && *y <= self.y + self.h
+    {
+      *pixel = self.color;
+    }
+  }
+
+  pub fn collide(&self, new_x: &mut i32, new_y: &i32, ball: &mut Ball) -> i32 {
+    if
+      *new_x >= (self.x as i32) && *new_x <= (self.x as i32) + (self.w as i32) &&
+      *new_y + (ball.h as i32) >= (self.y as i32) && *new_y <= (self.y as i32) + (self.h as i32)
+    {
+      *new_x = ball.x as i32 + -ball.x_vel;
+      ball.x_vel = -ball.x_vel;
+      ball.y_vel = ((self.y as i32) - (ball.y as i32)) / 2;
+    }
+    *new_x
   }
 }
