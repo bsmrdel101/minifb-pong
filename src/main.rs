@@ -47,8 +47,8 @@ fn main() {
   let mut started = false;
   let start_text = Text::new(1280, 720, 6);
   let score_text = Text::new(1280, 720, 4);
-  let player_1_score = 0;
-  let player_2_score = 0;
+  let mut player_1_score = 0;
+  let mut player_2_score = 0;
   let mut ball = Ball::new(30, 30);
   let mut paddle_1 = Paddle::new(20, 50);
 
@@ -84,16 +84,32 @@ fn main() {
     }
 
     if started {
-      ball.y = (ball.y as i32 + ball.y_vel) as usize;
-      ball.x = (ball.x as i32 + ball.x_vel) as usize;
+      let mut new_x = ball.x as i32 + ball.x_vel;
+      let new_y = ball.y as i32 + ball.y_vel;
 
-
-      if ball.x <= 0 || ball.x >= WIDTH {
-        ball.respawn();
+      if
+        new_x >= (paddle_1.x as i32) && new_x <= (paddle_1.x as i32) + (paddle_1.w as i32) &&
+        new_y + (ball.h as i32) >= (paddle_1.y as i32) && new_y <= (paddle_1.y as i32) + (paddle_1.h as i32)
+      {
+        new_x = ball.x as i32 + -ball.x_vel;
+        ball.x_vel = -ball.x_vel;
+        ball.y_vel = ((paddle_1.y as i32) - (ball.y as i32)) / 2;
       }
 
-      if ball.y >= HEIGHT - ball.h {
+      if new_x >= WIDTH as i32 {
+        player_1_score += 1;
+        ball.respawn();
+      } else if new_x + (ball.w as i32) <= 0 {
+        player_2_score += 1;
+        ball.respawn();
+      } else {
+        ball.x = new_x as usize;
+      }
+
+      if new_y + (ball.h as i32) >= (HEIGHT as i32) || new_y - (ball.h as i32) <= 0 {
         ball.y_vel = -ball.y_vel;
+      } else {
+        ball.y = new_y as usize;
       }
 
       score_text.draw(&mut buffer, (WIDTH / 2 - 75, 10), &format!("{} | {}", player_1_score, player_2_score));
@@ -126,7 +142,7 @@ impl Ball {
   pub fn respawn(&mut self) {
     sleep(time::Duration::from_secs_f32(0.5));
     let side = rand::rng().random_range(0..=1);
-    let mut x_vel = rand::rng().random_range(10..30);
+    let mut x_vel = rand::rng().random_range(10..20);
     if side == 0 {
       x_vel = -x_vel;
     }
